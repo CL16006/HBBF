@@ -11,6 +11,7 @@ let ctx = null
 
 const gameState  = ref('waiting')
 const stars      = ref(0)
+const lives      = ref(3)
 const totalStars = 5
 
 // Physics
@@ -92,9 +93,14 @@ function updatePlayer() {
     }
   }
 
-  // Fall — simple respawn
+  // Fall — lose a life and respawn
   if (player.y > H + 60) {
+    lives.value--
     player.x = 60; player.y = 270; player.vx = 0; player.vy = 0
+    if (lives.value <= 0) {
+      gameState.value = 'over'
+      cancelAnimationFrame(animFrame)
+    }
   }
 
   // Clamp
@@ -328,7 +334,7 @@ function draw() {
 
 function startGame() {
   cancelAnimationFrame(animFrame)
-  buildWorld(); stars.value = 0; gameState.value = 'playing'; frameCount = 0
+  buildWorld(); stars.value = 0; lives.value = 3; gameState.value = 'playing'; frameCount = 0
   animFrame = requestAnimationFrame(draw)
 }
 
@@ -368,7 +374,9 @@ onUnmounted(() => {
       <div class="hud-center font-pixel">
         <span>🎂 {{ stars }} / {{ totalStars }}</span>
       </div>
-      <div style="width:80px" />
+      <div class="lives font-pixel">
+        <span v-for="l in 3" :key="l" :style="{ opacity: l <= lives ? 1 : 0.25 }">🐱</span>
+      </div>
     </div>
 
     <!-- Canvas -->
@@ -385,7 +393,17 @@ onUnmounted(() => {
       <p class="hint">← → mover &nbsp; ↑ o Espacio saltar</p>
       <p class="hint">En móvil: toca para saltar, desliza para moverte</p>
       <p class="hint">¡Recolecta los {{ totalStars }} pasteles! 🎂</p>
+      <p class="hint">🐱🐱🐱 Tienes 3 vidas — ¡no caigas!</p>
       <button class="play-btn font-pixel" @click="startGame" id="jump-play-btn">▶ SALTAR</button>
+    </div>
+
+    <!-- Overlay: game over -->
+    <div v-if="gameState === 'over'" class="overlay" id="jump-over-overlay">
+      <p class="font-pixel" style="font-size:0.75rem; color:#ff4466">GAME OVER</p>
+      <p style="font-size:2rem">🙀</p>
+      <p class="hint">🎂 Pasteles: {{ stars }} / {{ totalStars }}</p>
+      <button class="play-btn font-pixel" @click="startGame" id="jump-retry-btn">🔄 REINTENTAR</button>
+      <button class="back-btn font-pixel" style="margin-top:6px" @click="router.push('/arcade')">← ARCADE</button>
     </div>
 
     <!-- Overlay: won -->
