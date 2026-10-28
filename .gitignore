@@ -15,8 +15,7 @@ coverage
 *.local
 
 # Editor directories and files
-.vscode/*
-!.vscode/extensions.json
+.vscode/
 .idea
 *.suo
 *.ntvs*
@@ -48,5 +47,3 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
-
-.vscode/*
