@@ -14,7 +14,7 @@ const cabinets = [
     desc: 'Esquiva obstáculos\ny llega a la meta',
     color: 'cyan',
     route: 'speed',
-    inspiracion: 'Need for Speed',
+    dificultad: '⚡ SPEED',
   },
   {
     key: 'fighter',
@@ -23,16 +23,16 @@ const cabinets = [
     desc: 'Vence al boss\ncon tus combos',
     color: 'pink',
     route: 'fighter',
-    inspiracion: 'Street Fighter',
+    dificultad: '🔥 EPIC',
   },
   {
     key: 'jump',
     title: 'JUMP QUEST',
-    icon: '🍄',
-    desc: 'Salta, corre\ny recolecta estrellas',
+    icon: '🐾',
+    desc: 'Salta, corre\ny recolecta pasteles',
     color: 'yellow',
     route: 'jump',
-    inspiracion: 'Mario Bros',
+    dificultad: '🎂 FUN',
   },
 ]
 
@@ -98,7 +98,7 @@ function isCompleted(key) {
         <div class="cabinet-panel">
           <h2 class="cabinet-title font-pixel">{{ cabinet.title }}</h2>
           <p class="cabinet-desc">{{ cabinet.desc }}</p>
-          <span class="cabinet-inspo">Inspirado en {{ cabinet.inspiracion }}</span>
+          <span class="cabinet-inspo font-pixel">{{ cabinet.dificultad }}</span>
         </div>
 
         <!-- Glow line at bottom -->
@@ -318,9 +318,13 @@ function isCompleted(key) {
   line-height: 1.5;
 }
 .cabinet-inspo {
-  font-size: 0.7rem;
-  color: rgba(255,255,255,0.2);
-  font-style: italic;
+  font-size: 0.42rem;
+  color: rgba(255,255,255,0.7);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  padding: 2px 8px;
+  letter-spacing: 0.1em;
+  background: rgba(255,255,255,0.05);
 }
 
 /* Glow line */
