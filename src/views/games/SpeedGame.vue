@@ -309,13 +309,13 @@ function draw() {
   frameCount++
   score.value = Math.floor(frameCount / 2)
 
-  // Update speed
-  const newLevel = Math.floor(score.value / 100) + 1
+  // Update speed — level sube cada 200 pts, incremento más suave
+  const newLevel = Math.floor(score.value / 300) + 1
   if (newLevel !== speedLevel.value) { speedLevel.value = newLevel }
-  speed = Math.min(3 + (speedLevel.value - 1) * 0.8, 12)
+  speed = Math.min(3 + (speedLevel.value - 1) * 0.4, 10)
 
-  // Spawn
-  const spawnRate = Math.max(55 - speedLevel.value * 5, 22)
+  // Spawn — más gradual
+  const spawnRate = Math.max(65 - speedLevel.value * 3, 30)
   if (frameCount % spawnRate === 0) spawnObstacle()
 
   // Update & draw obstacles
@@ -347,7 +347,7 @@ function draw() {
   drawCar(carX, carY, true)
 
   // Win
-  if (score.value >= 500) {
+  if (score.value >= 1500) {
     gameState.value = 'won'
     store.completeGame('speed')
     if (score.value > bestScore.value) {
@@ -378,7 +378,7 @@ onUnmounted(() => {
   cancelAnimationFrame(animFrame)
 })
 
-const progressPct = computed(() => Math.min((score.value / 500) * 100, 100))
+const progressPct = computed(() => Math.min((score.value / 1500) * 100, 100))
 </script>
 
 <template>
@@ -417,7 +417,7 @@ const progressPct = computed(() => Math.min((score.value / 500) * 100, 100))
       <!-- Canvas wrapper -->
       <div class="canvas-container">
         <!-- Progress bar at top of road -->
-        <div class="road-progress" aria-label="Progreso al 500">
+        <div class="road-progress" aria-label="Progreso al 1500">
           <div class="road-progress-fill" :style="{ height: progressPct + '%' }" />
           <span class="road-progress-label font-pixel">META</span>
         </div>
@@ -480,7 +480,7 @@ const progressPct = computed(() => Math.min((score.value / 500) * 100, 100))
               <div class="instr-text">En móvil</div>
             </div>
             <div class="instr-item goal-item">
-              <div class="instr-keys font-pixel text-neon-yellow">500 pts</div>
+              <div class="instr-keys font-pixel text-neon-yellow">1500 pts</div>
               <div class="instr-text">Para ganar</div>
             </div>
           </div>
