@@ -47,3 +47,6 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+#claude
+CLAUDE.md

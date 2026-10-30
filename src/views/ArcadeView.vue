@@ -5,6 +5,9 @@ import { useGameStore } from '../stores/game.js'
 const router = useRouter()
 const store = useGameStore()
 
+// 🛠️ DEV MODE
+const DEV_MODE = import.meta.env.DEV
+
 const cabinets = [
   {
     key: 'speed',
@@ -64,6 +67,8 @@ function isCompleted(key) {
       <div class="progress-bar-wrap">
         <div class="progress-bar" :style="{ width: (store.completedCount / 3 * 100) + '%' }" />
       </div>
+      <!-- Indicador DEV MODE -->
+      <div v-if="DEV_MODE" class="dev-badge font-pixel">🛠️ DEV MODE — todos los juegos desbloqueados</div>
     </header>
 
     <!-- Cabinet grid -->
@@ -165,6 +170,17 @@ function isCompleted(key) {
   padding: 20px 0 16px;
   width: 100%;
   max-width: 900px;
+}
+.dev-badge {
+  margin-top: 10px;
+  display: inline-block;
+  background: rgba(255, 200, 0, 0.12);
+  border: 1px solid rgba(255, 200, 0, 0.35);
+  color: #ffd000;
+  font-size: 0.38rem;
+  letter-spacing: 0.08em;
+  padding: 4px 12px;
+  border-radius: 4px;
 }
 .room-title {
   font-size: clamp(0.7rem, 2.5vw, 1.1rem);

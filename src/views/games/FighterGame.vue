@@ -16,7 +16,7 @@ const GROUND = 350
 // ── State ────────────────────────────────────────────────
 const gameState  = ref('waiting')
 const playerHP   = ref(100)
-const bossHP     = ref(100)
+const bossHP     = ref(150)   // boss más resistente
 const combo      = ref(0)
 const countdownVal = ref(3)
 const hitEffects = ref([])
@@ -45,12 +45,28 @@ function doPlayerAttack(type) {
   if (gameState.value !== 'playing') return
   if (['ultra', 'hurt'].includes(player.state)) return
 
-  let dmg = 0, txt = '', color = '#ffff00'
-  if (type === 'punch') { dmg = 9 + Math.random()*8;  player.state = 'punch'; player.stateTimer = 28; txt = 'HIT!';  color = '#00f5ff' }
-  if (type === 'kick')  { dmg = 16 + Math.random()*10; player.state = 'kick';  player.stateTimer = 32; txt = 'KICK!'; color = '#ff88ff' }
-  if (type === 'ultra') { dmg = 30 + Math.random()*18; player.state = 'ultra'; player.stateTimer = 48; txt = '🔥 ULTRA!'; color = '#ffdd00' }
+  // Rango máximo de cada ataque (en píxeles de distancia horizontal)
+  const RANGE = { punch: 130, kick: 160, ultra: 220 }
+  const dist = Math.abs(boss.x - player.x)
 
-  dmg *= (1 + combo.value * 0.12)
+  // Siempre se activa la animación del ataque
+  if (type === 'punch') { player.state = 'punch'; player.stateTimer = 28 }
+  if (type === 'kick')  { player.state = 'kick';  player.stateTimer = 32 }
+  if (type === 'ultra') { player.state = 'ultra'; player.stateTimer = 48 }
+
+  // Solo hace daño si el boss está al alcance
+  if (dist > RANGE[type]) {
+    spawnHit(player.x + (player.facing * 60), player.y - 120, '¡MISS!', 'rgba(255,255,255,0.5)')
+    return
+  }
+
+  let dmg = 0, txt = '', color = '#ffff00'
+  if (type === 'punch') { dmg = 6 + Math.random()*6;   txt = 'HIT!';      color = '#00f5ff' }
+  if (type === 'kick')  { dmg = 10 + Math.random()*8;  txt = 'KICK!';     color = '#ff88ff' }
+  if (type === 'ultra') { dmg = 18 + Math.random()*12; txt = '🔥 ULTRA!'; color = '#ffdd00' }
+
+  // Bonus de combo pero con límite para no hacer el juego trivial
+  dmg *= (1 + Math.min(combo.value, 5) * 0.08)
   bossHP.value = Math.max(0, bossHP.value - dmg)
   boss.state = 'hurt'; boss.stateTimer = 18
   screenShake()
@@ -81,8 +97,21 @@ function onKey(e) {
 }
 function onKeyUp(e) { delete keys[e.key] }
 
+// ── helpers ──────────────────────────────────────────────
+function heart(cx, cy, size) {
+  ctx.beginPath()
+  ctx.moveTo(cx, cy + size * 0.4)
+  ctx.bezierCurveTo(cx, cy, cx - size, cy, cx - size, cy - size * 0.35)
+  ctx.bezierCurveTo(cx - size, cy - size * 0.9, cx, cy - size * 0.75, cx, cy - size * 0.35)
+  ctx.bezierCurveTo(cx, cy - size * 0.75, cx + size, cy - size * 0.9, cx + size, cy - size * 0.35)
+  ctx.bezierCurveTo(cx + size, cy, cx, cy, cx, cy + size * 0.4)
+  ctx.closePath()
+}
+
 // ═══════════════════════════════════════════════════════
-//  DRAW FIGHTER — Cute Bear sprite 🐻
+//  DRAW FIGHTER — Milk & Mocha Bears 🤍🤎
+//  Proporciones fieles: cabeza enorme, cuerpo pequeñito,
+//  contorno negro grueso, estilo kawaii limpio.
 // ═══════════════════════════════════════════════════════
 function drawFighter(f, isPlayer) {
   const fc  = frameCount
@@ -97,333 +126,331 @@ function drawFighter(f, isPlayer) {
   const isUltra = st === 'ultra'
   const isIdle  = st === 'idle' || st === 'walk'
 
-  // Player bear = honey/cream | Boss bear = dark charcoal
-  const furMain    = isPlayer ? '#e8c88a'  : '#3a2020'
-  const furLight   = isPlayer ? '#f5dfa0'  : '#5a3030'
-  const furDark    = isPlayer ? '#c8a060'  : '#250f0f'
-  const bellyColor = isPlayer ? '#f7e8c8'  : '#4a2a2a'
-  const muzzleC    = isPlayer ? '#f5e0c0'  : '#5a3535'
-  const noseColor  = isPlayer ? '#220a0a'  : '#110005'
-  const bandColor  = isPlayer ? '#dd2222'  : '#6600cc'
-  const scarfColor = isPlayer ? '#1a55cc'  : '#cc1122'
-  const gloveC     = isPlayer ? '#dd3311'  : '#1133dd'
-  const glowC      = isPlayer ? 'rgba(255,200,60,0.7)' : 'rgba(255,40,80,0.6)'
-  const eyeColor   = isPlayer ? '#3a88ff'  : '#ff3333'
-  const cheekC     = isPlayer ? 'rgba(255,140,130,0.55)' : 'rgba(200,80,80,0.45)'
+  // ── Paleta Milk & Mocha ───────────────────────────────
+  // Milk = oso blanco puro con contorno negro fino
+  // Mocha = oso café cálido con contorno negro fino
+  const OL       = '#1a1008'                   // outline negro (igual para los dos)
+  const furFill  = isPlayer ? '#ffffff' : '#c8823c'   // blanco / café
+  const furShade = isPlayer ? '#e8e0d8' : '#a06020'   // sombra suave
+  const muzzle   = isPlayer ? '#f5f0ea' : '#e8c080'   // hocico
+  const earIn    = '#f0a0b0'                   // interior oreja rosa (igual)
+  const cheekC   = 'rgba(240,120,130,0.50)'   // mofletes rosa
+  const glowC    = isPlayer ? 'rgba(255,200,220,0.9)' : 'rgba(255,180,60,0.9)'
+  const heartC   = isPlayer ? '#ff6688' : '#ffaa22'   // color corazón ultra
 
-  const bob  = isIdle ? Math.sin(fc * 0.06) * 2.5 : 0
-  const shk  = isHurt ? (Math.random() * 7 - 3.5) : 0
+  const bob = isIdle ? Math.sin(fc * 0.07) * 2.5 : 0
+  const shk = isHurt ? (Math.random() * 5 - 2.5)  : 0
 
   ctx.save()
   ctx.translate(px + shk, 0)
   if (f.facing === -1) ctx.scale(-1, 1)
 
-  // Shadow
+  // ── Proporciones Milk & Mocha reales ─────────────────
+  // Cabeza ~55% de la altura total, cuerpo mini, piernas cortas
+  const GY  = f.y               // nivel del suelo
+  const HR  = 52                // radio cabeza (grande!)
+  const hcy = GY - 88 - HR + bob // centro de cabeza
+  const BCX = 0,  BCY = GY - 52  // centro cuerpo
+  const BRX = 30, BRY = 30      // radios cuerpo (pequeño)
+  const SY  = BCY - BRY + 6    // nivel hombro (donde salen los brazos)
+
+  // ── Sombra en el suelo ───────────────────────────────
+  ctx.fillStyle = 'rgba(0,0,0,0.15)'
+  ctx.beginPath(); ctx.ellipse(0, GY + 4, 40, 8, 0, 0, Math.PI*2); ctx.fill()
+
+  // ══════════════════════════════════════════════════════
+  //  PIERNAS — cortas y redondeadas como en las imágenes
+  // ══════════════════════════════════════════════════════
   ctx.shadowBlur = 0
-  ctx.fillStyle = 'rgba(0,0,0,0.25)'
-  ctx.beginPath(); ctx.ellipse(0, py + 4, 38, 10, 0, 0, Math.PI * 2); ctx.fill()
 
-  if (isUltra) { ctx.shadowBlur = 50; ctx.shadowColor = glowC }
-
-  // Body positions
-  const footY    = py
-  const legTopY  = footY - 55
-  const bellyBot = footY - 52
-  const bellyTop = footY - 145
-  const shoulderY = bellyTop + 14
-  const headCY   = footY - 185 + bob
-  const headR    = 30
-
-  // ── LEGS ──────────────────────────────────────────────
-  ctx.shadowBlur = 0
   if (isKick && t > 16) {
-    // Planted leg
-    ctx.fillStyle = furDark
-    ctx.beginPath(); ctx.roundRect(-20, legTopY, 18, 54, [9,9,18,18]); ctx.fill()
-    ctx.fillStyle = furMain
-    ctx.beginPath(); ctx.roundRect(-18, legTopY, 16, 52, [9,9,16,16]); ctx.fill()
-    ctx.fillStyle = furDark
-    ctx.beginPath(); ctx.ellipse(-10, footY + 2, 14, 10, 0, 0, Math.PI*2); ctx.fill()
-    // Kick leg
+    // pierna izq plantada
     const ext = Math.min((32 - t) / 8, 1)
-    ctx.fillStyle = furMain
-    ctx.beginPath()
-    ctx.moveTo(10, legTopY+2); ctx.lineTo(26, legTopY+2)
-    ctx.lineTo(38 + ext*30, legTopY - 16 - ext*9)
-    ctx.lineTo(22 + ext*26, legTopY - 20 - ext*9)
-    ctx.closePath(); ctx.fill()
-    ctx.shadowBlur = 15; ctx.shadowColor = 'rgba(255,180,0,0.6)'
-    ctx.fillStyle = furMain
-    ctx.beginPath(); ctx.ellipse(44 + ext*32, legTopY - 22 - ext*10, 14, 11, -0.4, 0, Math.PI*2); ctx.fill()
-    ctx.fillStyle = muzzleC
-    for (let i = 0; i < 3; i++) {
-      ctx.beginPath(); ctx.arc(38 + ext*32 + i*6, legTopY - 30 - ext*10, 3, 0, Math.PI*2); ctx.fill()
-    }
-    ctx.shadowBlur = 0
+    // outline pierna plantada
+    ctx.fillStyle = OL
+    ctx.beginPath(); ctx.roundRect(-24, GY - 38, 20, 38, [8,8,14,14]); ctx.fill()
+    ctx.fillStyle = furFill
+    ctx.beginPath(); ctx.roundRect(-22, GY - 36, 18, 36, [8,8,12,12]); ctx.fill()
+    // patita izq
+    ctx.fillStyle = OL; ctx.beginPath(); ctx.ellipse(-14, GY + 2, 16, 10, 0, 0, Math.PI*2); ctx.fill()
+    ctx.fillStyle = furFill; ctx.beginPath(); ctx.ellipse(-14, GY + 1, 14, 8, 0, 0, Math.PI*2); ctx.fill()
+    // pierna derecha pateando
+    const kx = 18 + ext * 52, ky = GY - 28 - ext * 22
+    ctx.fillStyle = OL
+    ctx.beginPath(); ctx.roundRect(4, GY - 36, 18, 26, 8); ctx.fill()
+    ctx.fillStyle = furFill
+    ctx.beginPath(); ctx.roundRect(6, GY - 34, 16, 24, 8); ctx.fill()
+    // patita pateando
+    ctx.fillStyle = OL; ctx.shadowBlur = 14; ctx.shadowColor = glowC
+    ctx.beginPath(); ctx.ellipse(kx, ky, 16, 12, -0.5, 0, Math.PI*2); ctx.fill()
+    ctx.fillStyle = furFill; ctx.shadowBlur = 0
+    ctx.beginPath(); ctx.ellipse(kx, ky, 14, 10, -0.5, 0, Math.PI*2); ctx.fill()
   } else {
-    const wbl = isIdle ? Math.sin(fc * 0.07) * 1 : 0
-    for (let leg = -1; leg <= 1; leg += 2) {
-      const lx = leg === -1 ? -19 : 3
-      const lw = 18
-      ctx.fillStyle = leg === -1 ? furDark : furMain
-      ctx.beginPath(); ctx.roundRect(lx + wbl*leg, legTopY, lw, 38, [10,10,4,4]); ctx.fill()
-      ctx.fillStyle = leg === -1 ? furMain : furDark
-      ctx.beginPath(); ctx.roundRect(lx - 1 + wbl*leg, legTopY + 34, lw+2, 22, [4,4,12,12]); ctx.fill()
-      ctx.fillStyle = furDark
-      ctx.beginPath(); ctx.ellipse(lx + lw/2 + wbl*leg, footY+3, lw/2+4, 8, 0, 0, Math.PI*2); ctx.fill()
-      ctx.fillStyle = furLight
-      ctx.beginPath(); ctx.ellipse(lx + lw/2 + wbl*leg, footY+2, lw/2+2, 6, 0, 0, Math.PI*2); ctx.fill()
-      ctx.fillStyle = muzzleC
-      for (let t2 = 0; t2 < 3; t2++) {
-        ctx.beginPath(); ctx.arc(lx+4+t2*5+wbl*leg, footY-2, 2.5, 0, Math.PI*2); ctx.fill()
+    const wb = isIdle ? Math.sin(fc * 0.08) * 1.5 : 0
+    // Dos piernitas juntas y cortas (postura sentado/de pie kawaii)
+    for (const [lx, side] of [[-22, -1], [2, 1]]) {
+      const lw = 18, lh = 36
+      ctx.fillStyle = OL
+      ctx.beginPath(); ctx.roundRect(lx + wb * side, GY - lh, lw, lh, [8,8,12,12]); ctx.fill()
+      ctx.fillStyle = furFill
+      ctx.beginPath(); ctx.roundRect(lx + 1 + wb * side, GY - lh + 1, lw - 2, lh - 2, [7,7,11,11]); ctx.fill()
+      // patita redonda
+      ctx.fillStyle = OL
+      ctx.beginPath(); ctx.ellipse(lx + lw/2 + wb*side, GY + 3, lw/2 + 4, 9, 0, 0, Math.PI*2); ctx.fill()
+      ctx.fillStyle = furFill
+      ctx.beginPath(); ctx.ellipse(lx + lw/2 + wb*side, GY + 2, lw/2 + 2, 7, 0, 0, Math.PI*2); ctx.fill()
+    }
+  }
+
+  // ══════════════════════════════════════════════════════
+  //  CUERPO — redondito y pequeño
+  // ══════════════════════════════════════════════════════
+  ctx.fillStyle = OL
+  ctx.beginPath(); ctx.ellipse(BCX, BCY, BRX + 3, BRY + 3, 0, 0, Math.PI*2); ctx.fill()
+  ctx.fillStyle = furFill
+  ctx.beginPath(); ctx.ellipse(BCX, BCY, BRX, BRY, 0, 0, Math.PI*2); ctx.fill()
+  // pancita más clara
+  ctx.fillStyle = isPlayer ? 'rgba(250,245,240,0.8)' : 'rgba(232,200,130,0.6)'
+  ctx.beginPath(); ctx.ellipse(BCX, BCY + 8, BRX * 0.6, BRY * 0.6, 0, 0, Math.PI*2); ctx.fill()
+
+  // ══════════════════════════════════════════════════════
+  //  BRAZOS — regordetos y cortos
+  // ══════════════════════════════════════════════════════
+  if (isPunch && t > 10) {
+    const ext = Math.min((28 - t) / 7, 1.0)
+    // brazo de atrás (quieto)
+    ctx.fillStyle = OL; ctx.beginPath(); ctx.roundRect(-46, SY, 18, 32, 9); ctx.fill()
+    ctx.fillStyle = furFill; ctx.beginPath(); ctx.roundRect(-44, SY + 1, 16, 30, 9); ctx.fill()
+    ctx.fillStyle = OL; ctx.beginPath(); ctx.ellipse(-36, SY + 36, 13, 11, 0, 0, Math.PI*2); ctx.fill()
+    ctx.fillStyle = furFill; ctx.beginPath(); ctx.ellipse(-36, SY + 35, 11, 9, 0, 0, Math.PI*2); ctx.fill()
+    // brazo que golpea — se extiende
+    ctx.shadowBlur = 22; ctx.shadowColor = glowC
+    ctx.fillStyle = OL
+    ctx.beginPath()
+    ctx.moveTo(28, SY); ctx.lineTo(28, SY + 20)
+    ctx.lineTo(28 + 52 * ext, SY + 17); ctx.lineTo(28 + 52 * ext, SY - 3)
+    ctx.closePath(); ctx.fill()
+    ctx.fillStyle = furFill
+    ctx.beginPath()
+    ctx.moveTo(30, SY + 2); ctx.lineTo(30, SY + 18)
+    ctx.lineTo(30 + 48 * ext, SY + 15); ctx.lineTo(30 + 48 * ext, SY - 1)
+    ctx.closePath(); ctx.fill()
+    ctx.shadowBlur = 0
+    // manita golpeando — puño redondo kawaii
+    ctx.fillStyle = OL; ctx.shadowBlur = 20; ctx.shadowColor = glowC
+    ctx.beginPath(); ctx.ellipse(32 + 52 * ext, SY + 8, 16, 13, 0, 0, Math.PI*2); ctx.fill()
+    ctx.fillStyle = furFill; ctx.shadowBlur = 0
+    ctx.beginPath(); ctx.ellipse(32 + 52 * ext, SY + 7, 14, 11, 0, 0, Math.PI*2); ctx.fill()
+    // ✨ estrellitas impacto
+    if (ext > 0.65) {
+      ctx.fillStyle = isPlayer ? '#ffd6e8' : '#ffe0a0'
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2 + fc * 0.25
+        ctx.beginPath(); ctx.arc(32 + 52*ext + Math.cos(a)*20, SY + 8 + Math.sin(a)*15, 3.5, 0, Math.PI*2); ctx.fill()
       }
     }
-  }
-
-  // ── BODY (chubby round bear belly) ────────────────────
-  ctx.fillStyle = furDark
-  ctx.beginPath()
-  ctx.ellipse(0, (bellyTop+bellyBot)/2, 36, (bellyBot-bellyTop)/2+6, 0, 0, Math.PI*2)
-  ctx.fill()
-  const bodyG = ctx.createRadialGradient(-8, bellyTop+20, 5, 0, (bellyTop+bellyBot)/2, 40)
-  bodyG.addColorStop(0, furLight); bodyG.addColorStop(0.5, furMain); bodyG.addColorStop(1, furDark)
-  ctx.fillStyle = bodyG
-  ctx.beginPath()
-  ctx.ellipse(0, (bellyTop+bellyBot)/2, 32, (bellyBot-bellyTop)/2+2, 0, 0, Math.PI*2)
-  ctx.fill()
-  // Belly patch
-  const blG = ctx.createRadialGradient(0, bellyBot-28, 2, 0, bellyBot-28, 24)
-  blG.addColorStop(0, bellyColor); blG.addColorStop(1, 'rgba(247,232,200,0)')
-  ctx.fillStyle = blG
-  ctx.beginPath(); ctx.ellipse(0, bellyBot-28, 20, 28, 0, 0, Math.PI*2); ctx.fill()
-  // Little scarf/belt
-  ctx.fillStyle = scarfColor
-  ctx.shadowBlur = 8; ctx.shadowColor = scarfColor
-  ctx.beginPath(); ctx.roundRect(-28, bellyBot-18, 56, 11, 5); ctx.fill()
-  ctx.fillStyle = isPlayer ? '#2266ff' : '#ff3322'
-  ctx.beginPath(); ctx.ellipse(0, bellyBot-13, 9, 7, 0, 0, Math.PI*2); ctx.fill()
-  ctx.shadowBlur = 0
-
-  // ── ARMS ──────────────────────────────────────────────
-  if (isPunch && t > 10) {
-    // Back arm
-    ctx.fillStyle = furDark
-    ctx.beginPath(); ctx.roundRect(-44, shoulderY, 18, 42, 9); ctx.fill()
-    ctx.fillStyle = furMain
-    ctx.beginPath(); ctx.roundRect(-42, shoulderY, 16, 40, 9); ctx.fill()
-    ctx.fillStyle = gloveC
-    ctx.beginPath(); ctx.ellipse(-34, shoulderY+48, 13, 11, 0.3, 0, Math.PI*2); ctx.fill()
-    ctx.fillStyle = 'rgba(255,255,255,0.25)'
-    ctx.beginPath(); ctx.ellipse(-37, shoulderY+44, 5, 4, 0.3, 0, Math.PI*2); ctx.fill()
-    // Punch arm
-    const ext = Math.min((28-t)/7, 1.0)
-    ctx.shadowBlur = 28; ctx.shadowColor = glowC
-    ctx.fillStyle = furDark
-    ctx.beginPath()
-    ctx.moveTo(26,shoulderY); ctx.lineTo(26,shoulderY+18)
-    ctx.lineTo(26+56*ext,shoulderY+14); ctx.lineTo(26+56*ext,shoulderY-4)
-    ctx.closePath(); ctx.fill()
-    ctx.fillStyle = furMain
-    ctx.beginPath()
-    ctx.moveTo(28,shoulderY+2); ctx.lineTo(28,shoulderY+16)
-    ctx.lineTo(28+52*ext,shoulderY+12); ctx.lineTo(28+52*ext,shoulderY-2)
-    ctx.closePath(); ctx.fill()
-    ctx.shadowBlur = 0
-    ctx.fillStyle = gloveC
-    ctx.shadowBlur = 22; ctx.shadowColor = glowC
-    ctx.beginPath(); ctx.ellipse(30+56*ext, shoulderY+5, 16, 14, 0, 0, Math.PI*2); ctx.fill()
-    ctx.fillStyle = 'rgba(255,255,255,0.28)'
-    ctx.beginPath(); ctx.ellipse(26+56*ext, shoulderY+1, 6, 5, 0, 0, Math.PI*2); ctx.fill()
-    ctx.shadowBlur = 0
 
   } else if (isUltra) {
-    const pulse = Math.sin(fc*0.35)*4
-    // Both arms up
-    ctx.fillStyle = furDark
-    ctx.beginPath(); ctx.roundRect(-46, shoulderY-12, 17, 38, 9); ctx.fill()
-    ctx.fillStyle = furMain
-    ctx.beginPath(); ctx.roundRect(-44, shoulderY-12, 15, 38, 9); ctx.fill()
-    ctx.fillStyle = gloveC; ctx.shadowBlur = 20; ctx.shadowColor = glowC
-    ctx.beginPath(); ctx.ellipse(-36, shoulderY-20, 14, 12, -0.4, 0, Math.PI*2); ctx.fill()
-    ctx.fillStyle = furDark
-    ctx.beginPath(); ctx.roundRect(29, shoulderY-12, 17, 38, 9); ctx.fill()
-    ctx.fillStyle = furMain
-    ctx.beginPath(); ctx.roundRect(29, shoulderY-12, 15, 38, 9); ctx.fill()
-    ctx.fillStyle = gloveC
-    ctx.beginPath(); ctx.ellipse(37, shoulderY-20, 14, 12, 0.4, 0, Math.PI*2); ctx.fill()
+    // Brazos levantados — postura ultra kawaii
+    const pulse = Math.sin(fc * 0.3) * 3
+    // brazo izq arriba
+    ctx.fillStyle = OL; ctx.beginPath(); ctx.roundRect(-44, SY - 20, 18, 36, 9); ctx.fill()
+    ctx.fillStyle = furFill; ctx.beginPath(); ctx.roundRect(-42, SY - 19, 16, 34, 9); ctx.fill()
+    ctx.fillStyle = OL; ctx.shadowBlur = 14; ctx.shadowColor = glowC
+    ctx.beginPath(); ctx.ellipse(-34, SY - 26, 14, 12, -0.4, 0, Math.PI*2); ctx.fill()
+    ctx.fillStyle = furFill; ctx.shadowBlur = 0
+    ctx.beginPath(); ctx.ellipse(-34, SY - 26, 12, 10, -0.4, 0, Math.PI*2); ctx.fill()
+    // brazo der arriba
+    ctx.fillStyle = OL; ctx.beginPath(); ctx.roundRect(26, SY - 20, 18, 36, 9); ctx.fill()
+    ctx.fillStyle = furFill; ctx.beginPath(); ctx.roundRect(26, SY - 19, 16, 34, 9); ctx.fill()
+    ctx.fillStyle = OL; ctx.shadowBlur = 14; ctx.shadowColor = glowC
+    ctx.beginPath(); ctx.ellipse(34, SY - 26, 14, 12, 0.4, 0, Math.PI*2); ctx.fill()
+    ctx.fillStyle = furFill; ctx.shadowBlur = 0
+    ctx.beginPath(); ctx.ellipse(34, SY - 26, 12, 10, 0.4, 0, Math.PI*2); ctx.fill()
+    // 💖 CORAZÓN gigante — como en las fotos de Milk & Mocha
+    const hcx = 60, hcy = SY - 24, hs = 22 + pulse
+    ctx.shadowBlur = 50; ctx.shadowColor = heartC
+    // outline corazón
+    ctx.fillStyle = OL
+    heart(hcx, hcy, hs + 3); ctx.fill()
+    // relleno corazón
+    ctx.fillStyle = heartC
+    heart(hcx, hcy, hs); ctx.fill()
+    // brillo corazón
+    ctx.fillStyle = 'rgba(255,255,255,0.50)'
+    ctx.beginPath(); ctx.ellipse(hcx - hs * 0.3, hcy - hs * 0.3, hs * 0.25, hs * 0.16, -0.4, 0, Math.PI*2); ctx.fill()
     ctx.shadowBlur = 0
-    // HONEY BALL ULTRA 🍯✨
-    const orbX = 58, orbY = shoulderY-14, orbR = 26+pulse
-    ctx.shadowBlur = 60; ctx.shadowColor = isPlayer ? '#ffcc00' : '#ff4466'
-    const orbG = ctx.createRadialGradient(orbX, orbY, 0, orbX, orbY, orbR)
-    orbG.addColorStop(0, '#ffffff')
-    orbG.addColorStop(0.3, isPlayer ? '#ffee88' : '#ff9944')
-    orbG.addColorStop(0.7, isPlayer ? '#ffaa00' : '#ff2244')
-    orbG.addColorStop(1, 'rgba(255,140,0,0)')
-    ctx.fillStyle = orbG
-    ctx.beginPath(); ctx.arc(orbX, orbY, orbR, 0, Math.PI*2); ctx.fill()
-    for (let s = 0; s < 5; s++) {
-      const ang = (s/5)*Math.PI*2 + fc*0.12
-      ctx.strokeStyle = isPlayer ? 'rgba(255,200,0,0.7)' : 'rgba(255,80,80,0.7)'
-      ctx.lineWidth = 2.5; ctx.shadowBlur = 0
-      ctx.beginPath(); ctx.arc(orbX, orbY, orbR*0.65, ang, ang+0.9); ctx.stroke()
+    // corazoncitos orbitando
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2 + fc * 0.07
+      const mx = hcx + Math.cos(a) * (hs + 16), my = hcy + Math.sin(a) * (hs + 12)
+      const ms = 8 + Math.sin(fc * 0.2 + i) * 2
+      ctx.fillStyle = isPlayer ? 'rgba(255,100,150,0.85)' : 'rgba(255,190,60,0.85)'
+      heart(mx, my, ms); ctx.fill()
     }
-    for (let sp = 0; sp < 4; sp++) {
-      const ang = (sp/4)*Math.PI*2 + fc*0.08
-      ctx.fillStyle = '#ffffff'; ctx.shadowBlur = 0
-      ctx.beginPath(); ctx.arc(orbX+Math.cos(ang)*(orbR+8), orbY+Math.sin(ang)*(orbR+8), 3+Math.sin(fc*0.2+sp)*1.5, 0, Math.PI*2); ctx.fill()
-    }
-    ctx.shadowBlur = 0
 
   } else {
-    // Idle — cute arms dangling
-    const sw = isIdle ? Math.sin(fc*0.06)*3 : 0
-    ctx.fillStyle = furDark
-    ctx.beginPath(); ctx.roundRect(-43, shoulderY+sw, 16, 38, 9); ctx.fill()
-    ctx.fillStyle = furMain
-    ctx.beginPath(); ctx.roundRect(-41, shoulderY+sw, 14, 38, 9); ctx.fill()
-    ctx.fillStyle = gloveC
-    ctx.beginPath(); ctx.ellipse(-34, shoulderY+46+sw, 13, 11, 0.2, 0, Math.PI*2); ctx.fill()
-    ctx.fillStyle = 'rgba(255,255,255,0.2)'
-    ctx.beginPath(); ctx.ellipse(-37, shoulderY+42+sw, 5, 4, 0.2, 0, Math.PI*2); ctx.fill()
-    ctx.fillStyle = furDark
-    ctx.beginPath(); ctx.roundRect(27, shoulderY-sw, 16, 38, 9); ctx.fill()
-    ctx.fillStyle = furMain
-    ctx.beginPath(); ctx.roundRect(27, shoulderY-sw, 14, 38, 9); ctx.fill()
-    ctx.fillStyle = gloveC
-    ctx.beginPath(); ctx.ellipse(34, shoulderY+46-sw, 13, 11, -0.2, 0, Math.PI*2); ctx.fill()
-    ctx.fillStyle = 'rgba(255,255,255,0.2)'
-    ctx.beginPath(); ctx.ellipse(31, shoulderY+42-sw, 5, 4, -0.2, 0, Math.PI*2); ctx.fill()
+    // Idle — bracitos colgando kawaii con balanceo suave
+    const sw = isIdle ? Math.sin(fc * 0.07) * 4 : 0
+    // brazo izq
+    ctx.fillStyle = OL; ctx.beginPath(); ctx.roundRect(-44, SY + sw, 18, 32, 9); ctx.fill()
+    ctx.fillStyle = furFill; ctx.beginPath(); ctx.roundRect(-42, SY + sw + 1, 16, 30, 9); ctx.fill()
+    ctx.fillStyle = OL; ctx.beginPath(); ctx.ellipse(-34, SY + sw + 36, 13, 11, 0.2, 0, Math.PI*2); ctx.fill()
+    ctx.fillStyle = furFill; ctx.beginPath(); ctx.ellipse(-34, SY + sw + 35, 11, 9, 0.2, 0, Math.PI*2); ctx.fill()
+    // brazo der
+    ctx.fillStyle = OL; ctx.beginPath(); ctx.roundRect(26, SY - sw, 18, 32, 9); ctx.fill()
+    ctx.fillStyle = furFill; ctx.beginPath(); ctx.roundRect(26, SY - sw + 1, 16, 30, 9); ctx.fill()
+    ctx.fillStyle = OL; ctx.beginPath(); ctx.ellipse(34, SY - sw + 36, 13, 11, -0.2, 0, Math.PI*2); ctx.fill()
+    ctx.fillStyle = furFill; ctx.beginPath(); ctx.ellipse(34, SY - sw + 35, 11, 9, -0.2, 0, Math.PI*2); ctx.fill()
   }
 
-  // ── HEAD (big, round, adorable) ───────────────────────
-  // Ears
-  ctx.fillStyle = furDark
-  ctx.beginPath(); ctx.arc(-22, headCY-headR+8, 13, 0, Math.PI*2); ctx.fill()
-  ctx.beginPath(); ctx.arc(22,  headCY-headR+8, 13, 0, Math.PI*2); ctx.fill()
-  ctx.fillStyle = furMain
-  ctx.beginPath(); ctx.arc(-22, headCY-headR+8, 11, 0, Math.PI*2); ctx.fill()
-  ctx.beginPath(); ctx.arc(22,  headCY-headR+8, 11, 0, Math.PI*2); ctx.fill()
-  // Inner ear pink
-  ctx.fillStyle = isPlayer ? 'rgba(255,140,130,0.85)' : 'rgba(180,80,80,0.75)'
-  ctx.beginPath(); ctx.arc(-22, headCY-headR+8, 6, 0, Math.PI*2); ctx.fill()
-  ctx.beginPath(); ctx.arc(22,  headCY-headR+8, 6, 0, Math.PI*2); ctx.fill()
+  // ══════════════════════════════════════════════════════
+  //  CABEZA — enorme y redonda, rasgo más icónico
+  // ══════════════════════════════════════════════════════
 
-  if (isUltra) { ctx.shadowBlur = 35; ctx.shadowColor = glowC }
+  // Orejas (detrás de la cabeza)
+  for (const ex of [-(HR - 8), HR - 8]) {
+    ctx.fillStyle = OL
+    ctx.beginPath(); ctx.arc(ex, hcy - HR + 12, 17, 0, Math.PI*2); ctx.fill()
+    ctx.fillStyle = furFill
+    ctx.beginPath(); ctx.arc(ex, hcy - HR + 12, 14, 0, Math.PI*2); ctx.fill()
+    // interior oreja rosa
+    ctx.fillStyle = earIn
+    ctx.beginPath(); ctx.arc(ex, hcy - HR + 12, 8, 0, Math.PI*2); ctx.fill()
+  }
 
-  // Head sphere
-  const hG = ctx.createRadialGradient(-8, headCY-10, 4, 0, headCY, headR)
-  hG.addColorStop(0, furLight); hG.addColorStop(0.55, furMain); hG.addColorStop(1, furDark)
-  ctx.fillStyle = hG
-  ctx.beginPath(); ctx.arc(0, headCY, headR, 0, Math.PI*2); ctx.fill()
+  if (isUltra) { ctx.shadowBlur = 28; ctx.shadowColor = glowC }
+
+  // cabeza — outline grueso
+  ctx.fillStyle = OL
+  ctx.beginPath(); ctx.arc(0, hcy, HR + 3, 0, Math.PI*2); ctx.fill()
+  // cabeza — relleno
+  ctx.fillStyle = furFill
+  ctx.beginPath(); ctx.arc(0, hcy, HR, 0, Math.PI*2); ctx.fill()
+  // sombra sutil en la parte inferior
+  const headShade = ctx.createRadialGradient(8, hcy - 14, 4, 0, hcy, HR)
+  headShade.addColorStop(0, isPlayer ? 'rgba(255,255,255,0)' : 'rgba(210,160,80,0)')
+  headShade.addColorStop(1, isPlayer ? 'rgba(200,190,180,0.35)' : 'rgba(120,60,10,0.35)')
+  ctx.fillStyle = headShade
+  ctx.beginPath(); ctx.arc(0, hcy, HR, 0, Math.PI*2); ctx.fill()
   ctx.shadowBlur = 0
 
-  // Muzzle snout
-  ctx.fillStyle = furDark
-  ctx.beginPath(); ctx.ellipse(0, headCY+11, 16, 12, 0, 0, Math.PI*2); ctx.fill()
-  ctx.fillStyle = muzzleC
-  ctx.beginPath(); ctx.ellipse(0, headCY+10, 15, 11, 0, 0, Math.PI*2); ctx.fill()
+  // ── HOCICO (muzzle) ───────────────────────────────────
+  // outline hocico
+  ctx.fillStyle = OL
+  ctx.beginPath(); ctx.ellipse(0, hcy + 22, 22, 17, 0, 0, Math.PI*2); ctx.fill()
+  // relleno hocico — color más claro que el cuerpo
+  ctx.fillStyle = muzzle
+  ctx.beginPath(); ctx.ellipse(0, hcy + 21, 20, 15, 0, 0, Math.PI*2); ctx.fill()
 
-  // Button nose
-  ctx.fillStyle = noseColor
+  // nariz — oval pequeña oscura (estilo Milk & Mocha)
+  ctx.fillStyle = OL
   ctx.beginPath()
-  ctx.arc(-3, headCY+5, 4, Math.PI, 0)
-  ctx.arc(3,  headCY+5, 4, Math.PI, 0)
-  ctx.lineTo(0, headCY+11); ctx.closePath(); ctx.fill()
-  ctx.fillStyle = 'rgba(255,255,255,0.35)'
-  ctx.beginPath(); ctx.ellipse(-2, headCY+3, 2, 1.5, 0, 0, Math.PI*2); ctx.fill()
+  ctx.arc(-3, hcy + 13, 4.5, Math.PI, 0)
+  ctx.arc(3,  hcy + 13, 4.5, Math.PI, 0)
+  ctx.lineTo(0, hcy + 20); ctx.closePath(); ctx.fill()
+  // brillito nariz
+  ctx.fillStyle = 'rgba(255,255,255,0.55)'
+  ctx.beginPath(); ctx.ellipse(-2, hcy + 11, 2.5, 1.8, 0, 0, Math.PI*2); ctx.fill()
 
-  // Mouth
-  ctx.strokeStyle = furDark; ctx.lineWidth = 2; ctx.lineCap = 'round'
+  // boca kawaii — W suave
+  ctx.strokeStyle = OL; ctx.lineWidth = 2.2; ctx.lineCap = 'round'
   if (isUltra) {
-    ctx.beginPath(); ctx.arc(0, headCY+16, 7, 0.15, Math.PI-0.15)
-    ctx.fillStyle = '#220000'; ctx.fill(); ctx.stroke()
-    ctx.fillStyle = '#ff6688'
-    ctx.beginPath(); ctx.ellipse(0, headCY+21, 5, 3.5, 0, 0, Math.PI*2); ctx.fill()
+    ctx.beginPath(); ctx.arc(0, hcy + 28, 7, 0.1, Math.PI - 0.1)
+    ctx.fillStyle = '#1a0808'; ctx.fill(); ctx.stroke()
   } else if (isHurt) {
     ctx.beginPath()
-    ctx.moveTo(-6, headCY+20); ctx.quadraticCurveTo(0, headCY+17, 6, headCY+20); ctx.stroke()
+    ctx.moveTo(-6, hcy + 30); ctx.quadraticCurveTo(0, hcy + 26, 6, hcy + 30); ctx.stroke()
   } else {
-    // Cute W mouth ✿
     ctx.beginPath()
-    ctx.moveTo(-7, headCY+16)
-    ctx.quadraticCurveTo(-3.5, headCY+21, 0, headCY+17)
-    ctx.quadraticCurveTo(3.5, headCY+21, 7, headCY+16)
+    ctx.moveTo(-8, hcy + 24)
+    ctx.quadraticCurveTo(-4, hcy + 30, 0, hcy + 25)
+    ctx.quadraticCurveTo(4,  hcy + 30, 8, hcy + 24)
     ctx.stroke()
   }
 
-  // Eyes
-  const eyeY  = headCY - 4
-  const eyeLX = -11, eyeRX = 11
+  // ── OJOS — estilo Milk & Mocha: negros grandes con punto blanco ──
+  const eyeY = hcy - 4
+  const eL = -16, eR = 16
+
   if (isHurt) {
-    ctx.strokeStyle = eyeColor; ctx.lineWidth = 2.5; ctx.lineCap = 'round'
-    for (const [ex, ey] of [[eyeLX, eyeY], [eyeRX, eyeY]]) {
-      ctx.beginPath(); ctx.moveTo(ex-5, ey-5); ctx.lineTo(ex+5, ey+5); ctx.stroke()
-      ctx.beginPath(); ctx.moveTo(ex+5, ey-5); ctx.lineTo(ex-5, ey+5); ctx.stroke()
+    ctx.strokeStyle = OL; ctx.lineWidth = 3; ctx.lineCap = 'round'
+    for (const ex of [eL, eR]) {
+      ctx.beginPath(); ctx.moveTo(ex - 7, eyeY - 7); ctx.lineTo(ex + 7, eyeY + 7); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(ex + 7, eyeY - 7); ctx.lineTo(ex - 7, eyeY + 7); ctx.stroke()
     }
+    // lágrima gota kawaii
+    ctx.fillStyle = 'rgba(100,180,255,0.90)'
+    ctx.beginPath(); ctx.ellipse(eL - 2, eyeY + 14, 4, 7, 0.2, 0, Math.PI*2); ctx.fill()
   } else {
-    ctx.fillStyle = '#ffffff'
-    ctx.beginPath(); ctx.ellipse(eyeLX, eyeY, 8, 8, 0, 0, Math.PI*2); ctx.fill()
-    ctx.beginPath(); ctx.ellipse(eyeRX, eyeY, 8, 8, 0, 0, Math.PI*2); ctx.fill()
-    ctx.fillStyle = eyeColor
-    ctx.beginPath(); ctx.arc(eyeLX, eyeY, 5.5, 0, Math.PI*2); ctx.fill()
-    ctx.beginPath(); ctx.arc(eyeRX, eyeY, 5.5, 0, Math.PI*2); ctx.fill()
-    ctx.fillStyle = '#000014'
-    ctx.beginPath(); ctx.arc(eyeLX+0.5, eyeY+0.5, 3, 0, Math.PI*2); ctx.fill()
-    ctx.beginPath(); ctx.arc(eyeRX+0.5, eyeY+0.5, 3, 0, Math.PI*2); ctx.fill()
-    ctx.fillStyle = 'rgba(255,255,255,0.95)'
-    ctx.beginPath(); ctx.arc(eyeLX+2.5, eyeY-2.5, 2, 0, Math.PI*2); ctx.fill()
-    ctx.beginPath(); ctx.arc(eyeLX-1.5, eyeY+2, 1, 0, Math.PI*2); ctx.fill()
-    ctx.beginPath(); ctx.arc(eyeRX+2.5, eyeY-2.5, 2, 0, Math.PI*2); ctx.fill()
-    ctx.beginPath(); ctx.arc(eyeRX-1.5, eyeY+2, 1, 0, Math.PI*2); ctx.fill()
-    // Lashes
-    ctx.strokeStyle = '#33114a'; ctx.lineWidth = 1.5; ctx.lineCap = 'round'
-    for (const [ex, ey2] of [[eyeLX, eyeY], [eyeRX, eyeY]]) {
-      for (let l = -1; l <= 1; l++) {
-        ctx.beginPath(); ctx.moveTo(ex+l*5, ey2-7); ctx.lineTo(ex+l*6.5, ey2-11); ctx.stroke()
+    for (const ex of [eL, eR]) {
+      // ojo negro grande (sin esclerótica blanca — estilo más fiel)
+      ctx.fillStyle = OL
+      ctx.beginPath(); ctx.arc(ex, eyeY, 10, 0, Math.PI*2); ctx.fill()
+      // brillo blanco — característica clave de Milk & Mocha
+      ctx.fillStyle = '#ffffff'
+      ctx.beginPath(); ctx.arc(ex + 4, eyeY - 4, 4, 0, Math.PI*2); ctx.fill()
+      ctx.beginPath(); ctx.arc(ex - 3, eyeY + 3, 2, 0, Math.PI*2); ctx.fill()
+    }
+    // pestañas delicadas solo para Milk
+    if (isPlayer) {
+      ctx.strokeStyle = OL; ctx.lineWidth = 1.8; ctx.lineCap = 'round'
+      for (const ex of [eL, eR]) {
+        ctx.beginPath(); ctx.moveTo(ex - 7, eyeY - 8); ctx.lineTo(ex - 9, eyeY - 13); ctx.stroke()
+        ctx.beginPath(); ctx.moveTo(ex,     eyeY - 10); ctx.lineTo(ex,    eyeY - 15); ctx.stroke()
+        ctx.beginPath(); ctx.moveTo(ex + 7, eyeY - 8); ctx.lineTo(ex + 9, eyeY - 13); ctx.stroke()
       }
     }
   }
 
-  // Eyebrows
-  ctx.strokeStyle = furDark; ctx.lineWidth = 2.5; ctx.lineCap = 'round'
-  const bl = isUltra ? -3 : isHurt ? 3 : 0
-  ctx.beginPath()
-  ctx.moveTo(eyeLX-8, eyeY-11+bl); ctx.quadraticCurveTo(eyeLX, eyeY-14+bl, eyeLX+8, eyeY-11+bl); ctx.stroke()
-  ctx.beginPath()
-  ctx.moveTo(eyeRX-8, eyeY-11+bl); ctx.quadraticCurveTo(eyeRX, eyeY-14+bl, eyeRX+8, eyeY-11+bl); ctx.stroke()
-
-  // Rosy cheeks 🌸
+  // ── MOFLETES — óvalos rosas redondos, signo más icónico ──
   ctx.fillStyle = cheekC
-  ctx.beginPath(); ctx.ellipse(eyeLX-12, eyeY+7, 9, 6, 0, 0, Math.PI*2); ctx.fill()
-  ctx.beginPath(); ctx.ellipse(eyeRX+12, eyeY+7, 9, 6, 0, 0, Math.PI*2); ctx.fill()
+  ctx.beginPath(); ctx.ellipse(eL - 16, eyeY + 12, 14, 9, 0, 0, Math.PI*2); ctx.fill()
+  ctx.beginPath(); ctx.ellipse(eR + 16, eyeY + 12, 14, 9, 0, 0, Math.PI*2); ctx.fill()
 
-  // Bow on head 🎀
-  const bowY = headCY - headR - 2
-  ctx.fillStyle = bandColor
-  ctx.shadowBlur = 10; ctx.shadowColor = bandColor
+  // ── CEJAS expresivas ─────────────────────────────────
+  ctx.strokeStyle = OL; ctx.lineWidth = 3; ctx.lineCap = 'round'
+  const brow = isUltra ? -5 : isHurt ? 5 : 0
   ctx.beginPath()
-  ctx.moveTo(-4, bowY); ctx.quadraticCurveTo(-20, bowY-10, -24, bowY-2)
-  ctx.quadraticCurveTo(-20, bowY+10, -4, bowY+6); ctx.closePath(); ctx.fill()
+  ctx.moveTo(eL - 10, eyeY - 14 + brow)
+  ctx.quadraticCurveTo(eL, eyeY - 19 + brow, eL + 10, eyeY - 14 + brow)
+  ctx.stroke()
   ctx.beginPath()
-  ctx.moveTo(4, bowY); ctx.quadraticCurveTo(20, bowY-10, 24, bowY-2)
-  ctx.quadraticCurveTo(20, bowY+10, 4, bowY+6); ctx.closePath(); ctx.fill()
-  ctx.fillStyle = isPlayer ? '#ff3355' : '#7700dd'
-  ctx.beginPath(); ctx.ellipse(0, bowY+3, 6, 5, 0, 0, Math.PI*2); ctx.fill()
+  ctx.moveTo(eR - 10, eyeY - 14 + brow)
+  ctx.quadraticCurveTo(eR, eyeY - 19 + brow, eR + 10, eyeY - 14 + brow)
+  ctx.stroke()
+
+  // ── LACITO en la cabeza 🎀 (igual que en los stickers) ──
+  const bwx = 0, bwy = hcy - HR - 2
+  ctx.shadowBlur = 6; ctx.shadowColor = isPlayer ? '#f090a8' : '#70b8d8'
+  ctx.fillStyle = isPlayer ? '#f4a0b8' : '#80c4e0'
+  // ala izq
+  ctx.beginPath()
+  ctx.moveTo(bwx - 2, bwy + 4)
+  ctx.quadraticCurveTo(bwx - 20, bwy - 14, bwx - 24, bwy - 2)
+  ctx.quadraticCurveTo(bwx - 20, bwy + 14, bwx - 2, bwy + 8)
+  ctx.closePath(); ctx.fill()
+  // ala der
+  ctx.beginPath()
+  ctx.moveTo(bwx + 2, bwy + 4)
+  ctx.quadraticCurveTo(bwx + 20, bwy - 14, bwx + 24, bwy - 2)
+  ctx.quadraticCurveTo(bwx + 20, bwy + 14, bwx + 2, bwy + 8)
+  ctx.closePath(); ctx.fill()
+  // nudo central
+  ctx.fillStyle = isPlayer ? '#ee6888' : '#50a8cc'
+  ctx.beginPath(); ctx.ellipse(bwx, bwy + 5, 8, 7, 0, 0, Math.PI*2); ctx.fill()
   ctx.shadowBlur = 0
 
-  // Hurt flash + stars
+  // ── EFECTO DE DAÑO ───────────────────────────────────
   if (isHurt) {
     ctx.globalAlpha = 0.18
-    ctx.fillStyle = '#ff2200'
-    ctx.beginPath()
-    ctx.ellipse(0, (bellyTop+bellyBot)/2, 42, (bellyBot-bellyTop)/2+35, 0, 0, Math.PI*2)
-    ctx.fill()
+    ctx.fillStyle = '#ff3366'
+    ctx.beginPath(); ctx.ellipse(0, hcy, HR + 10, HR + 40, 0, 0, Math.PI*2); ctx.fill()
     ctx.globalAlpha = 1
-    for (let s2 = 0; s2 < 3; s2++) {
-      const ang = (s2/3)*Math.PI*2 + fc*0.15
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI*2 + fc * 0.15
       ctx.font = '14px serif'; ctx.textAlign = 'center'
-      ctx.fillText('⭐', Math.cos(ang)*40, headCY-headR-18+Math.sin(ang)*10)
+      ctx.fillText('💫', Math.cos(a) * 44, hcy - HR - 18 + Math.sin(a) * 10)
     }
   }
 
@@ -574,26 +601,79 @@ function update() {
     if (boss.y >= GROUND) { boss.y = GROUND; boss.jumpVY = 0; boss.onGround = true; if (boss.state === 'jump') boss.state = 'idle' }
   }
 
-  // Boss AI
+  // Boss AI — comportamiento agresivo por fases según HP
   if (boss.state === 'idle' && gameState.value === 'playing') {
-    boss.attackCooldown = (boss.attackCooldown ?? 90) - 1
+    boss.attackCooldown = (boss.attackCooldown ?? 50) - 1
+
+    // Fase 2: boss < 60% HP → se pone agresivo
+    // Fase 3: boss < 30% HP → modo BERSERKER
+    const bossRatio = bossHP.value / 100
+    const phase = bossRatio < 0.3 ? 3 : bossRatio < 0.6 ? 2 : 1
+
     if (boss.attackCooldown <= 0) {
       const r = Math.random()
       const dist = Math.abs(boss.x - player.x)
-      if (r < 0.2 && dist > 120) {
-        boss.x = Math.max(player.x + 80, boss.x - 4)
-      } else if (r < 0.55 && dist < 200) {
-        const type = Math.random() < 0.5 ? 'punch' : 'kick'
-        const dmg = type === 'punch' ? (7 + Math.random() * 9) : (12 + Math.random() * 11)
+
+      // PERSECUCIÓN: el boss siempre intenta acercarse al jugador
+      if (dist > 110) {
+        const speed = phase === 3 ? 6 : phase === 2 ? 5 : 3
+        boss.x = Math.max(player.x + 75, boss.x - speed)
+      }
+
+      // ATAQUES — frecuencia y daño escalan con la fase
+      const attackChance = phase === 3 ? 0.82 : phase === 2 ? 0.68 : 0.50
+      if (r < attackChance && dist < 190) {
+        // En fase 3 el boss puede hacer ultra
+        const roll = Math.random()
+        let type, dmg
+        if (phase === 3 && roll < 0.25) {
+          type = 'ultra'
+          dmg = 22 + Math.random() * 14   // ultra del boss: 22-36
+        } else if (roll < 0.45) {
+          type = 'kick'
+          dmg = phase === 3 ? (20 + Math.random() * 14)   // fase 3: 20-34
+              : phase === 2 ? (16 + Math.random() * 12)   // fase 2: 16-28
+              :               (11 + Math.random() * 9)    // fase 1: 11-20
+        } else {
+          type = 'punch'
+          dmg = phase === 3 ? (13 + Math.random() * 10)   // fase 3: 13-23
+              : phase === 2 ? (10 + Math.random() * 9)    // fase 2: 10-19
+              :               (7  + Math.random() * 7)    // fase 1:  7-14
+        }
+
+        // Bloqueo del jugador: si está en animación de ataque recibe 30% menos
+        if (['punch','kick','ultra'].includes(player.state)) dmg *= 0.7
+
         playerHP.value = Math.max(0, playerHP.value - dmg)
-        boss.state = type; boss.stateTimer = type === 'punch' ? 28 : 32
+        boss.state = type
+        boss.stateTimer = type === 'ultra' ? 48 : type === 'kick' ? 32 : 28
         spawnHit(player.x + 10, player.y - 140 - Math.random() * 30, `-${Math.floor(dmg)}`, '#ff4444')
         screenShake()
         if (playerHP.value <= 0) { gameState.value = 'lost'; cancelAnimationFrame(animFrame) }
-      } else if (r < 0.7 && boss.onGround) {
-        boss.jumpVY = -13; boss.onGround = false; boss.state = 'jump'
+
+      } else if (dist > 190 || r > attackChance) {
+        // Salto evasivo ocasional (más frecuente en fases altas)
+        const jumpChance = phase === 3 ? 0.45 : phase === 2 ? 0.30 : 0.18
+        if (Math.random() < jumpChance && boss.onGround) {
+          boss.jumpVY = phase === 3 ? -15 : -13
+          boss.onGround = false; boss.state = 'jump'
+        }
       }
-      boss.attackCooldown = 55 + Math.floor(Math.random() * 60)
+
+      // Cooldown más corto en fases avanzadas
+      const minCd = phase === 3 ? 18 : phase === 2 ? 28 : 40
+      const maxCd = phase === 3 ? 35 : phase === 2 ? 50 : 70
+      boss.attackCooldown = minCd + Math.floor(Math.random() * (maxCd - minCd))
+
+      // Aviso visual de fase (solo una vez por fase)
+      if (phase === 2 && !boss._phase2warned) {
+        boss._phase2warned = true
+        spawnHit(boss.x, boss.y - 200, '😤 FURIOSO', '#ff8800')
+      }
+      if (phase === 3 && !boss._phase3warned) {
+        boss._phase3warned = true
+        spawnHit(boss.x, boss.y - 200, '🔥 BERSERKER!', '#ff2200')
+      }
     }
   }
 
@@ -638,11 +718,11 @@ function draw() {
 
 // ── Start game ────────────────────────────────────────────
 function startGame() {
-  playerHP.value = 100; bossHP.value = 100; combo.value = 0
+  playerHP.value = 100; bossHP.value = 150; combo.value = 0
   frameCount = 0; hitEffects.value = []
   player = makeChar(110, GROUND, 1)
   boss   = makeChar(600, GROUND, -1)
-  boss.attackCooldown = 90
+  boss.attackCooldown = 50   // empieza a atacar más rápido
   countdownVal.value = 3
   gameState.value = 'countdown'
   initBg()
@@ -686,10 +766,11 @@ onUnmounted(() => {
   cancelAnimationFrame(animFrame)
 })
 
+const BOSS_MAX_HP  = 150
 const playerHPPct  = computed(() => Math.max(0, playerHP.value))
-const bossHPPct    = computed(() => Math.max(0, bossHP.value))
+const bossHPPct    = computed(() => Math.max(0, bossHP.value / BOSS_MAX_HP * 100))
 const playerHPBg   = computed(() => playerHP.value > 50 ? 'linear-gradient(90deg,#00c8ff,#0055ff)' : playerHP.value > 25 ? 'linear-gradient(90deg,#ffcc00,#ff7700)' : 'linear-gradient(90deg,#ff2200,#ff0055)')
-const bossHPBg     = computed(() => bossHP.value   > 50 ? 'linear-gradient(90deg,#ff7700,#ff1060)' : bossHP.value   > 25 ? 'linear-gradient(90deg,#ffcc00,#ff5500)' : 'linear-gradient(90deg,#ff0000,#880000)')
+const bossHPBg     = computed(() => bossHP.value > 90  ? 'linear-gradient(90deg,#ff7700,#ff1060)' : bossHP.value > 45  ? 'linear-gradient(90deg,#ffcc00,#ff5500)' : 'linear-gradient(90deg,#ff0000,#880000)')
 </script>
 
 <template>
@@ -739,12 +820,12 @@ const bossHPBg     = computed(() => bossHP.value   > 50 ? 'linear-gradient(90deg
     <div v-if="gameState === 'waiting'" class="ov" id="fighter-start-ov" role="dialog" aria-modal="true">
       <div class="oc fc">
         <div class="vsb">
-          <div class="cp"><div class="cs">🥷</div><span class="cl font-pixel">TÚ</span></div>
+          <div class="cp"><div class="cs">🤍</div><span class="cl font-pixel">TÚ</span></div>
           <span class="vs font-pixel">VS</span>
-          <div class="cp"><div class="cs bs">💀</div><span class="cl font-pixel">BOSS</span></div>
+          <div class="cp"><div class="cs bs">🤎</div><span class="cl font-pixel">BOSS</span></div>
         </div>
-        <h2 class="ot font-pixel text-neon-pink">STREET FIGHTER</h2>
-        <p class="os">Inspirado en el personaje Ryu</p>
+        <h2 class="ot font-pixel text-neon-pink">OSO FIGHTERS 🐻</h2>
+        <p class="os">Milk 🤍 vs Mocha 🤎</p>
         <div class="cg">
           <div class="ci"><kbd class="ky">Z</kbd><span>Golpe</span></div>
           <div class="ci"><kbd class="ky">X</kbd><span>Patada</span></div>

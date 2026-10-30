@@ -1,5 +1,8 @@
 import { defineStore } from 'pinia'
 
+// 🛠️ DEV MODE: desbloquea todos los juegos (solo en desarrollo)
+const DEV_MODE = import.meta.env.DEV
+
 export const useGameStore = defineStore('game', {
   state: () => ({
     // Juegos completados: false = bloqueado, true = completado
@@ -13,11 +16,12 @@ export const useGameStore = defineStore('game', {
   }),
   getters: {
     allGamesCompleted: (state) =>
-      state.games.speed && state.games.fighter && state.games.jump,
+      DEV_MODE || (state.games.speed && state.games.fighter && state.games.jump),
     completedCount: (state) =>
       Object.values(state.games).filter(Boolean).length,
-    // Cuántos juegos están desbloqueados (el siguiente después del completado)
+    // En DEV_MODE todos están desbloqueados
     unlockedGames: (state) => {
+      if (DEV_MODE) return { speed: true, fighter: true, jump: true }
       const unlocked = { speed: true, fighter: false, jump: false }
       if (state.games.speed) unlocked.fighter = true
       if (state.games.fighter) unlocked.jump = true
@@ -26,7 +30,7 @@ export const useGameStore = defineStore('game', {
   },
   actions: {
     completeGame(gameKey) {
-      if (this.games.hasOwnProperty(gameKey)) {
+      if (Object.prototype.hasOwnProperty.call(this.games, gameKey)) {
         this.games[gameKey] = true
       }
     },
