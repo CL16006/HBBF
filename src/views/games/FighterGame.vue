@@ -33,6 +33,172 @@ function makeChar(x, y, facing) {
            jumpVY: 0, onGround: true, attackTrail: [] }
 }
 
+// ══════════════════════════════════════════════════════════
+//  #3 SONIDOS KAWAII — Web Audio API (sin dependencias)
+// ══════════════════════════════════════════════════════════
+let audioCtx = null
+function getAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+  if (audioCtx.state === 'suspended') audioCtx.resume()
+  return audioCtx
+}
+
+function playSound(type) {
+  try {
+    const a = getAudio()
+    const t = a.currentTime
+    const note = (freq, start, dur, vol = 0.25, wave = 'sine') => {
+      const o = a.createOscillator()
+      const g = a.createGain()
+      o.connect(g); g.connect(a.destination)
+      o.type = wave
+      o.frequency.setValueAtTime(freq, t + start)
+      g.gain.setValueAtTime(vol, t + start)
+      g.gain.exponentialRampToValueAtTime(0.001, t + start + dur)
+      o.start(t + start); o.stop(t + start + dur + 0.01)
+    }
+    switch (type) {
+      case 'punch':
+        note(320, 0,    0.08, 0.28, 'square')
+        note(120, 0.05, 0.12, 0.18, 'sawtooth')
+        break
+      case 'kick':
+        note(200, 0,    0.05, 0.35, 'sawtooth')
+        note(80,  0.04, 0.18, 0.22, 'sine')
+        break
+      case 'ultra':
+        // Acorde ascendente ✨
+        note(440, 0,    0.25, 0.22, 'sine')
+        note(660, 0.08, 0.25, 0.22, 'sine')
+        note(880, 0.16, 0.35, 0.28, 'sine')
+        note(1320, 0.24, 0.4, 0.22, 'triangle')
+        break
+      case 'hurt':
+        note(180, 0, 0.06, 0.20, 'square')
+        note(90,  0.05, 0.22, 0.15, 'sawtooth')
+        break
+      case 'miss':
+        note(200, 0, 0.06, 0.08, 'sine')
+        note(160, 0.05, 0.08, 0.06, 'sine')
+        break
+      case 'boss_hurt':
+        note(260, 0, 0.05, 0.18, 'square')
+        note(130, 0.04, 0.15, 0.12, 'sawtooth')
+        break
+      case 'win':
+        // Fanfarria kawaii 🎉
+        [523, 659, 784, 1047, 1319].forEach((f, i) => note(f, i*0.14, 0.28, 0.22, 'triangle'))
+        note(1047, 0.8, 0.6, 0.18, 'sine')
+        break
+      case 'lose':
+        note(330, 0,    0.15, 0.20, 'sawtooth')
+        note(220, 0.15, 0.25, 0.18, 'sawtooth')
+        note(110, 0.38, 0.55, 0.18, 'sawtooth')
+        break
+      case 'jump':
+        note(300, 0, 0.04, 0.12, 'sine')
+        note(480, 0.03, 0.12, 0.10, 'sine')
+        break
+    }
+  } catch (e) { /* audio no disponible */ }
+}
+
+// ══════════════════════════════════════════════════════════
+//  #1 MENSAJES DEL BOSS — burbujas de texto en canvas
+// ══════════════════════════════════════════════════════════
+const MSGS = {
+  idle: [
+    '¡Feliz cumpleaños! 🎂',
+    '¡Hoy es tu día! 🎉',
+    '¡Pelea, cumpleañera!',
+    '¡Ven aquí! 🐾',
+    '¡Vamos, vamos! 💪',
+    '¡Te tengo! 🤎',
+    '¡Soy el mejor! 😤',
+    '¡Jeje... 😏',
+  ],
+  phase2: [
+    '¡Ahora sí me enojo! 😤',
+    '¡MODO FURIOSO! 🔥',
+    '¡No me rindo!',
+    '¡Aaaargh! 🐻',
+  ],
+  phase3: [
+    '¡BERSERKER! 💥',
+    '¡TODO POR TI! 🔥',
+    '¡ÚLTIMA OPORTUNIDAD!',
+    '¡No puedes ganarme! 😤',
+  ],
+  hit: [
+    '¡Auch! 😖',
+    '¡Eso dolió!',
+    '¡Oye! 😤',
+    '¡Trampa! 😱',
+  ],
+  attack: [
+    '¡Toma! 👊',
+    '¡Ja! 😏',
+    '¡Sorpresa! 🐾',
+    '¡Rin rin! 🛎️',
+  ],
+}
+
+let bossBubble = null   // { text, life, maxLife }
+let bubbleCooldown = 0
+
+function showBubble(category) {
+  const pool = MSGS[category]
+  const text = pool[Math.floor(Math.random() * pool.length)]
+  bossBubble = { text, life: 160, maxLife: 160 }
+}
+
+function drawBossBubble() {
+  if (!bossBubble || bossBubble.life <= 0) return
+  bossBubble.life--
+  const p = bossBubble.life / bossBubble.maxLife
+  if (p <= 0) return
+
+  const alpha = p > 0.85 ? 1 : p > 0.15 ? 1 : p / 0.15
+  const bx = boss.x + (boss.facing === -1 ? -20 : 20)
+  const by = boss.y - 230
+
+  ctx.save()
+  ctx.globalAlpha = alpha
+
+  // Medir texto
+  ctx.font = "bold 13px 'Segoe UI Emoji', Arial, sans-serif"
+  const tw = ctx.measureText(bossBubble.text).width
+  const pw = tw + 22, ph = 32
+  const rx = bx - pw / 2, ry = by - ph / 2
+
+  // Burbuja redondeada
+  ctx.fillStyle = 'rgba(255,255,255,0.95)'
+  ctx.strokeStyle = '#1a1008'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.roundRect(rx, ry, pw, ph, 10)
+  ctx.fill(); ctx.stroke()
+
+  // Rabito de la burbuja apuntando al boss
+  ctx.beginPath()
+  ctx.moveTo(bx - 6, ry + ph - 1)
+  ctx.lineTo(bx,     ry + ph + 10)
+  ctx.lineTo(bx + 6, ry + ph - 1)
+  ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.fill()
+  ctx.strokeStyle = '#1a1008'; ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(bx - 6, ry + ph)
+  ctx.lineTo(bx,     ry + ph + 10)
+  ctx.lineTo(bx + 6, ry + ph); ctx.stroke()
+
+  // Texto
+  ctx.fillStyle = '#1a1008'
+  ctx.textAlign = 'center'
+  ctx.fillText(bossBubble.text, bx, ry + ph/2 + 5)
+
+  ctx.restore()
+}
+
 // ── Hit effects ──────────────────────────────────────────
 function spawnHit(x, y, text, color) {
   hitEffects.value.push({ x, y, text, color, life: 50, maxLife: 50 })
@@ -56,6 +222,7 @@ function doPlayerAttack(type) {
 
   // Solo hace daño si el boss está al alcance
   if (dist > RANGE[type]) {
+    playSound('miss')
     spawnHit(player.x + (player.facing * 60), player.y - 120, '¡MISS!', 'rgba(255,255,255,0.5)')
     return
   }
@@ -69,14 +236,17 @@ function doPlayerAttack(type) {
   dmg *= (1 + Math.min(combo.value, 5) * 0.08)
   bossHP.value = Math.max(0, bossHP.value - dmg)
   boss.state = 'hurt'; boss.stateTimer = 18
+  playSound(type)
   screenShake()
   combo.value++
   clearTimeout(comboResetTimer)
   comboResetTimer = setTimeout(() => { combo.value = 0 }, 1800)
 
   spawnHit(boss.x - 10, boss.y - 160 - Math.random()*40, txt, color)
+  if (Math.random() < 0.6) showBubble('hit')
 
   if (bossHP.value <= 0) {
+    playSound('win')
     gameState.value = 'won'
     store.completeGame('fighter')
     cancelAnimationFrame(animFrame)
@@ -92,6 +262,7 @@ function onKey(e) {
   if (k === 'x') doPlayerAttack('kick')
   if (k === 'c') doPlayerAttack('ultra')
   if ((k === 'w' || k === 'arrowup' || e.key === ' ') && player.onGround) {
+    playSound('jump')
     player.jumpVY = -16; player.onGround = false; player.state = 'jump'
   }
 }
@@ -649,7 +820,9 @@ function update() {
         boss.stateTimer = type === 'ultra' ? 48 : type === 'kick' ? 32 : 28
         spawnHit(player.x + 10, player.y - 140 - Math.random() * 30, `-${Math.floor(dmg)}`, '#ff4444')
         screenShake()
-        if (playerHP.value <= 0) { gameState.value = 'lost'; cancelAnimationFrame(animFrame) }
+        playSound('hurt')
+        if (Math.random() < 0.55) showBubble('attack')
+        if (playerHP.value <= 0) { playSound('lose'); gameState.value = 'lost'; cancelAnimationFrame(animFrame) }
 
       } else if (dist > 190 || r > attackChance) {
         // Salto evasivo ocasional (más frecuente en fases altas)
@@ -669,10 +842,19 @@ function update() {
       if (phase === 2 && !boss._phase2warned) {
         boss._phase2warned = true
         spawnHit(boss.x, boss.y - 200, '😤 FURIOSO', '#ff8800')
+        showBubble('phase2')
       }
       if (phase === 3 && !boss._phase3warned) {
         boss._phase3warned = true
         spawnHit(boss.x, boss.y - 200, '🔥 BERSERKER!', '#ff2200')
+        showBubble('phase3')
+      }
+
+      // Burbujas idle periódicas
+      bubbleCooldown--
+      if (bubbleCooldown <= 0 && boss.state === 'idle') {
+        showBubble('idle')
+        bubbleCooldown = 180 + Math.floor(Math.random() * 120)
       }
     }
   }
@@ -695,6 +877,7 @@ function draw() {
   drawFighter(player, true)
   drawFighter(boss, false)
   drawHitFX()
+  drawBossBubble()
 
   // FIGHT! intro text
   if (frameCount < 70) {
@@ -780,7 +963,7 @@ const bossHPBg     = computed(() => bossHP.value > 90  ? 'linear-gradient(90deg,
     <!-- HUD -->
     <div class="hud" id="fighter-hud">
       <div class="hp-side" id="player-hp">
-        <span class="fname font-pixel pname">TÚ</span>
+        <span class="fname font-pixel pname">{{ store.birthdayPerson || 'TÚ' }}</span>
         <div class="hptrack"><div class="hpfill" :style="{ width: playerHPPct+'%', background: playerHPBg }"/></div>
         <span class="hpnum font-pixel">{{ Math.ceil(playerHP) }}</span>
       </div>
@@ -820,7 +1003,7 @@ const bossHPBg     = computed(() => bossHP.value > 90  ? 'linear-gradient(90deg,
     <div v-if="gameState === 'waiting'" class="ov" id="fighter-start-ov" role="dialog" aria-modal="true">
       <div class="oc fc">
         <div class="vsb">
-          <div class="cp"><div class="cs">🤍</div><span class="cl font-pixel">TÚ</span></div>
+          <div class="cp"><div class="cs">🤍</div><span class="cl font-pixel">{{ store.birthdayPerson || 'TÚ' }}</span></div>
           <span class="vs font-pixel">VS</span>
           <div class="cp"><div class="cs bs">🤎</div><span class="cl font-pixel">BOSS</span></div>
         </div>
@@ -833,6 +1016,10 @@ const bossHPBg     = computed(() => bossHP.value > 90  ? 'linear-gradient(90deg,
           <div class="ci"><kbd class="ky">W</kbd><span>Saltar</span></div>
           <div class="ci"><kbd class="ky">A / D</kbd><span>Moverse</span></div>
           <div class="ci goal"><span class="font-pixel" style="color:#ffdd00;font-size:0.45rem">HP boss = 0 → GANAS</span></div>
+        </div>
+        <div class="name-row">
+          <label class="font-pixel name-lbl">¿Cómo te llamas? 🐾</label>
+          <input class="name-inp" v-model="store.birthdayPerson" maxlength="12" placeholder="Tu nombre" />
         </div>
         <button class="fb font-pixel" @click="startGame" id="fighter-play-btn">⚔️ PELEAR</button>
       </div>
@@ -930,4 +1117,11 @@ const bossHPBg     = computed(() => bossHP.value > 90  ? 'linear-gradient(90deg,
 
 /* combo enter */
 .cb-enter-active{animation:zoom-in .2s ease}
+
+/* Name input */
+.name-row{display:flex;flex-direction:column;align-items:center;gap:6px;width:100%}
+.name-lbl{font-size:0.4rem;color:rgba(255,255,255,.55);letter-spacing:.06em}
+.name-inp{background:rgba(255,255,255,.07);border:1px solid rgba(0,200,255,.25);border-radius:8px;color:#fff;font-family:inherit;font-size:0.9rem;padding:8px 14px;text-align:center;width:180px;outline:none;transition:.2s}
+.name-inp:focus{border-color:rgba(0,200,255,.6);box-shadow:0 0 14px rgba(0,200,255,.2);background:rgba(255,255,255,.1)}
+.name-inp::placeholder{color:rgba(255,255,255,.25)}
 </style>
